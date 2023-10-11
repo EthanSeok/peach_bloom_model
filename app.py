@@ -1,0 +1,97 @@
+import pandas as pd
+import requests
+from io import StringIO
+import streamlit as st
+import numpy as np
+
+year = 2001
+year_for = 22
+
+def ischill(df, Tc):
+    Tn = df['tmin']
+    Tx = df['tmax']
+    Tm = (Tx + Tn)/2
+    if 0 <= Tc <= Tn <= Tx:
+        return 0
+    elif 0 <= Tn <= Tc <= Tx:
+        return -((Tm - Tn) - ((Tx - Tc)**2) / (2 * (Tx - Tn)))
+    elif 0 <= Tn <= Tx <= Tc:
+        return (-(Tm - Tn))
+    elif Tn <= 0 <= Tx <= Tc:
+        return -((Tx**2) / (2 * (Tx - Tn)))
+    elif Tn <= 0 <= Tc <= Tx:
+        return -(Tx**2)/ (2*(Tx-Tn)) - (((Tx - Tc)**2)/(2*(Tx-Tn)))
+
+
+def isantichill(df, Tc):
+    Tn = df['tmin']
+    Tx = df['tmax']
+    Tm = (Tx + Tn) / 2
+
+    if 0 <= Tc <= Tn <= Tx:
+        return (Tm - Tc)
+    elif 0 <= Tn <= Tc <= Tx:
+        return (Tx - Tc)**2/(2*(Tx - Tn))
+    elif 0 <= Tn <= Tx <= Tc:
+        return 0
+    elif Tn <= 0 <= Tx <= Tc:
+        return 0
+    elif Tn <= 0 <= Tc <= Tx:
+        return (Tx - Tc)**2/(2*(Tx - Tn))
+
+
+def dvr_e(df):
+    C = 0.014
+    D = 0.062
+
+    if df['tavg'] >= 5:
+        return C * np.exp(D * df['tavg'])
+    else:
+        return 0
+
+
+def dvr_model(df, Tc, Hr):
+    df = df[df['month'] >= 2]
+    # df = df[df.index >= '01-30']
+    df['Cdt'] = df.apply(lambda x: ischill(x, Tc[x['location']]), axis=1)
+    df['Cat'] = df.apply(lambda x: isantichill(x, Tc[x['location']]), axis=1)
+    df['Cd'] = abs(df['Cdt']).cumsum()
+    df['Ca'] = abs(df['Cat']).cumsum()
+    print(df)
+    bloom = df[df['Ca'] >= Hr[df['location'][0]]].iloc[0].name.strftime('%m월%d일')
+    return bloom
+
+
+    # df['DVRt'] = df.apply(dvr_e, axis=1)
+    # df['DVR'] = df['DVRt'].cumsum()
+    # print(df[df['month'] == 4])
+
+def main():
+    st.title('복숭아 개화 시기 예측')
+    select_year = st.number_input('연도 선택', min_value=2001, max_value=2023, value=2022)
+    num_area = {'101': '춘천', '119': "수원", '131': '청주', '143': '대구', '156': "광주", '192': "진주"}
+    area_num = {'춘천': '101', '수원': "119", '청주': '131', '대구': '143', '광주': "156", '진주': "192"}
+    Tc = {'101': 5, '119': 6, '131': 7, '143': 5.2, '156': 8, '192': 5.1}
+    Cr = {'101': -110, '119': -73, '131': -95, '143': -130, '156': -74, '192': -148}
+    Hr = {'101': 245, '119': 180.2, '131': 199.2, '143': 277.4, '156': 150, '192': 271}
+
+    # df_loc = pd.read_csv('data/location.csv')
+    loc = st.selectbox('측후소 선택', list(num_area.values()))
+    location = area_num[loc]
+    if st.button('chill 모델 실행'):
+        st.write(f'{loc}지역의 {select_year}년의 복숭화 개화 모델 실행중...')
+        url = f'https://api.taegon.kr/station/{location}/?sy={year}&ey={year + year_for}&format=csv'
+        response = requests.get(url)
+        csv_data = response.content.decode('utf-8')
+        df = pd.read_csv(StringIO(csv_data), skipinitialspace=True)
+
+        df = df[df['year'] == select_year]
+        df = df[['year', 'month', 'day', 'tavg', 'tmax', 'tmin']]
+        df['date'] = pd.to_datetime(df[['year', 'month', 'day']])
+        df['location'] = str(location)
+        df['DOY'] = df['date'].dt.dayofyear
+        df.set_index('date', inplace=True)
+        st.write(f'{select_year}년 {loc}의 복숭아의 예상 개화일은 {dvr_model(df, Tc, Hr)}')
+
+if __name__ == '__main__':
+    main()
