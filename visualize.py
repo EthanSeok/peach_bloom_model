@@ -7,10 +7,10 @@ import os
 import numpy as np
 
 ## windows
-font_path = "C:/Windows/Fonts/KoPubDotumMedium.ttf"
-font = font_manager.FontProperties(fname=font_path).get_name()
-plt.rcParams['axes.unicode_minus'] = False
-rc('font', family=font)
+# font_path = "C:/Windows/Fonts/KoPubDotumMedium.ttf"
+# font = font_manager.FontProperties(fname=font_path).get_name()
+# plt.rcParams['axes.unicode_minus'] = False
+# rc('font', family=font)
 
 ## mac
 # rc('font', family='AppleGothic')
@@ -63,10 +63,6 @@ def all_visual(df, ob, Hr, loc, eval):
     num_area = {'101': '춘천', '119': "수원", '131': '청주', '143': '대구', '156': "광주", '192': "진주"}
     chill_result = df[(df['location'] == int(loc)) & (df['Ca'] >= Hr[loc])].groupby('year').first()
     dvr_result = df[(df['location'] == int(loc)) & (df['DVR'] >= 1)].groupby('year').first()
-
-    if loc == '143':
-        chill_result.to_csv('chill_result.csv')
-        dvr_result.to_csv('dvr_result.csv')
 
     fig, ax = plt.subplots(figsize=(10, 4.7), dpi=150, facecolor="w")
     chill_result['month_day'] = pd.to_datetime(chill_result['month_day'], format='%m-%d')
