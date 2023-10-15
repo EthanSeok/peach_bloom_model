@@ -47,24 +47,20 @@ def dvr_e(df, C, D):
     else:
         return 0
 
-def dvr_model(df, Tc, C, D):
-    df = df[df['month'] >= 2]
+def models(df, Tc, C, D):
+    df = df[(df['date'].dt.month > 1) | ((df['date'].dt.month == 1) & (df['date'].dt.day >= 30))]
     df['Cdt'] = df.apply(lambda x: ischill(x, Tc[x['location']]), axis=1)
     df['Cat'] = df.apply(lambda x: isantichill(x, Tc[x['location']]), axis=1)
     df['Cd'] = abs(df['Cdt']).cumsum()
     df['Ca'] = abs(df['Cat']).cumsum()
     df['DVRi'] = df.apply(lambda x: dvr_e(x, C[x['location']], D[x['location']]), axis=1)
     df['DVR'] = df['DVRi'].cumsum()
-    # print(df)
-    # bloom_chill = df[df['Ca'] >= Hr[df['location'][0]]].iloc[0].name.strftime('%m월%d일')
-    # bloom_dvr = df[df['DVR'] >= 1].iloc[0].name.strftime('%m월%d일')
 
     return df
 
-
-
 def main():
     results = []
+    ob = pd.read_csv('data/observe.csv')
     C = {'101': 0.011, '119': 0.007, '131': 0.002, '143': 0.006, '156': 0.017, '192': 0.020}
     D = {'101': 0.093, '119': 0.138, '131': 0.261, '143': 0.129, '156': 0.043, '192': 0.028}
     Tc = {'101': 5, '119': 6, '131': 7, '143': 5.2, '156': 8, '192': 5.1}
@@ -78,20 +74,21 @@ def main():
         csv_data = response.content.decode('utf-8')
         df = pd.read_csv(StringIO(csv_data), skipinitialspace=True)
 
-        df = df[['year', 'month', 'day', 'tavg', 'tmax', 'tmin']]
+        df = df[['year', 'month', 'day', 'tavg', 'tmax', 'tmin', 'rainfall', 'snow']]
         df['date'] = pd.to_datetime(df[['year', 'month', 'day']])
         df['location'] = str(loc)
         df['DOY'] = df['date'].dt.dayofyear
         for year in range(start_year, start_year + year_for + 1):
             year_df = df[df['year'] == year].copy()
-            result = dvr_model(year_df, Tc, C, D)
+            result = models(year_df, Tc, C, D)
             results.append(result)
 
     result_df = pd.concat(results, axis=0, ignore_index=False)
-    output_dir_txt = "./output/images"
+    output_dir_txt = "./output"
+
     if not os.path.exists(output_dir_txt):
         os.makedirs(output_dir_txt)
-    result_df.to_csv('results.csv')
+    result_df.to_csv(f'{output_dir_txt}/results.csv')
 
 if __name__ == '__main__':
     main()
